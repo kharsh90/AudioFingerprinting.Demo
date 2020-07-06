@@ -1,5 +1,10 @@
 ﻿using ATL;
+using Castle.MicroKernel.Registration;
+using Castle.Windsor;
 using NAudio.Wave;
+using Newtonsoft.Json;
+using SoundFingerprinting.AddictedCS.Demo.EFDatabase;
+using SoundFingerprinting.AddictedCS.Demo.Repositories;
 using SoundFingerprinting.Audio;
 using SoundFingerprinting.Builder;
 using SoundFingerprinting.Configuration;
@@ -7,6 +12,7 @@ using SoundFingerprinting.DAO.Data;
 using SoundFingerprinting.Data;
 using SoundFingerprinting.InMemory;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,43 +23,43 @@ namespace SoundFingerprinting.AddictedCS.Demo
     {
         static readonly IModelService modelService = new InMemoryModelService(); // store fingerprints in RAM
         static readonly IAudioService audioService = new SoundFingerprintingAudioService(); // default audio library
-        //static WaveInEvent waveSource = null;
-        //static WaveFileWriter waveFile = null;
+        static IAudioFingerprintRepository repo = null;
 
         static async Task Main(string[] args)
         {
-            await StoreForLaterRetrieval("./Generic PBX IVR -Customers.wav", "Customers IVR");
-            await StoreForLaterRetrieval("./Emma-EmailSupport.wav", "email");
-            await StoreForLaterRetrieval("./Emma-FTP.wav", "ftp");
-            await StoreForLaterRetrieval("./Emma-Hardware-Support.wav", "hardware");
+            var container = new WindsorContainer();
+            container.Register(Component.For<IAudioFingerprintRepository>().ImplementedBy<AudioFingerprintRepository>());
+            // Resolving
+            repo = container.Resolve<IAudioFingerprintRepository>();
 
-            
+            await StoreForLaterRetrieval("./Generic PBX IVR -Customers.wav");
+            //await StoreForLaterRetrieval("./Emma-EmailSupport.wav", "email");
+            //await StoreForLaterRetrieval("./Emma-FTP.wav", "ftp");
+            //await StoreForLaterRetrieval("./Emma-Hardware-Support.wav", "hardware");
+
             string audioPath = Path.GetFullPath("./Generic PBX IVR -Customers.wav");
             var audiobytes = ConvertAudioToByteArray(audioPath);
 
             TrimWavFile(audioPath, "TrimmedAudio1.wav", TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15));
+            TrimWavFile(audioPath, "TrimmedAudio2.wav", TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(5));
+            TrimWavFile(audioPath, "TrimmedAudio3.wav", TimeSpan.FromSeconds(12), TimeSpan.FromSeconds(7));
 
-            //Full audio is of 29 seconds. below trying to create sample of full audio and trying to match it with full audio
+
+            //Full audio is of 29 seconds. We can also sample an audio file using following way.
             var sampleAudioDuration1 = audiobytes.Length /5; // this audio is of 5 seconds
             var sampleAudioBytes1 = audiobytes.Take(sampleAudioDuration1).ToArray();
             ConvertByteArrayToAudio("SampledAudio1.wav", sampleAudioBytes1);
 
-            var sampleAudioDuration2 = audiobytes.Length /10; // this audio is of 2 seconds
-            var sampleAudioBytes2 = audiobytes.Take(sampleAudioDuration2).ToArray();
-            ConvertByteArrayToAudio("SampledAudio2.wav", sampleAudioBytes2);
-
-            var sampleAudioDuration3 = audiobytes.Length / 100; // this audio is of 0.29 seconds
-            var sampleAudioBytes3 = audiobytes.Take(sampleAudioDuration3).ToArray();
-            ConvertByteArrayToAudio("SampledAudio3.wav", sampleAudioBytes3);
-
             var foundTrack1 = await GetBestMatchForSong("./SampledAudio1.wav");
-            Console.WriteLine("Sample audio 1 :" + foundTrack1?.Id);
-            var foundTrack2 = await GetBestMatchForSong("./SampledAudio2.wav");
-            Console.WriteLine("Sample audio 2 :" + foundTrack2?.Id);
-            var foundTrack3 = await GetBestMatchForSong("./SampledAudio3.wav");
-            Console.WriteLine("Sample audio 3 :" + foundTrack3?.Id);
+            Console.WriteLine("Best matching audio track is :" + foundTrack1?.Id);
+            var foundTrack2 = await GetBestMatchForSong("./TrimmedAudio2.wav");
+            Console.WriteLine("Best matching audio track is :" + foundTrack2?.Id);
+            var foundTrack3 = await GetBestMatchForSong("./TrimmedAudio3.wav");
+            Console.WriteLine("Best matching audio track is :" + foundTrack3?.Id);
             var foundTrack4 = await GetBestMatchForSong("./TrimmedAudio1.wav");
-            Console.WriteLine("Sample audio 4 :" + foundTrack4?.Id);
+            Console.WriteLine("Best matching audio track is :" + foundTrack4?.Id);
+            var foundTrack5 = await GetBestMatchForSong("./Emma-EmailSupport.wav");
+            Console.WriteLine("Best matching audio track is :" + foundTrack5?.Id);
 
 
             var audioTrack = new Track("./Emma-EmailSupport.wav");
@@ -69,29 +75,6 @@ namespace SoundFingerprinting.AddictedCS.Demo
             var audioFilePath2 = Path.GetFullPath("byteArrayToAudio.wav");
             PlayAudio(audioFilePath2);
 
-            
-
-            //record voice, read and write it's metadata. 
-            //Console.WriteLine("Press 1 to record your audio. Any other key to exit");
-            //RecordAudio("MyAudio1");            
-            //var path3 = Path.GetFullPath("MyAudio1.wav");
-            //var recordedAudioTrack = new Track(path3);
-            //ReadMetadata(recordedAudioTrack);
-            //WriteMetadata(recordedAudioTrack);
-            //PlayAudio(path3);
-            
-            //fingerprinting of recorded voice.
-            //await StoreForLaterRetrieval(path3, "MyVoice");
-            //var recordedAudioMatch = await GetBestMatchForSong(path3);
-
-            //Console.WriteLine("Press 1 to record your audio. Any other key to exit");
-            //RecordAudio("MyAudio2");
-            //var path4 = Path.GetFullPath("MyAudio2.wav");
-            //PlayAudio(path4);
-
-
-
-            //Console.WriteLine(recordedAudioMatch?.Id);
             Console.ReadLine();
         
         }
@@ -147,9 +130,10 @@ namespace SoundFingerprinting.AddictedCS.Demo
         }
         private static void ReadMetadata(Track audioTrack)
         {
+            Console.Write("*************** Reading metadata of an audio file*******************");
             Console.WriteLine("Title of audio " + audioTrack.Title);
             Console.WriteLine("Bitrate of audio " + audioTrack.Bitrate);
-            Console.WriteLine("Sample rate of audio" + audioTrack.SampleRate);
+            Console.WriteLine("Sample rate of audio " + audioTrack.SampleRate);
             foreach (var field in audioTrack.AdditionalFields)
             {
                 Console.WriteLine("Key is " + field.Key);
@@ -160,21 +144,12 @@ namespace SoundFingerprinting.AddictedCS.Demo
 
         private static void WriteMetadata(Track audioTrack)
         {
+            Console.Write("*************** Writing to metadata of an audio file*******************");
             audioTrack.Album = "Test Album";
             Console.WriteLine("Album name is " + audioTrack.Album);
 
         }
-        //private static void RecordAudio(string fileName)
-        //{
-            
-        //    var input = Console.ReadLine();
-        //    while (input == "1")
-        //    {
-        //        StartRecording(fileName);
-        //        input = Console.ReadLine();
-        //    }
-        //    StopRecording();
-        //}
+
         private static void PlayAudio(string filePath)
         {
             //var bytes = File.ReadAllBytes(filePath); // as sample
@@ -187,53 +162,16 @@ namespace SoundFingerprinting.AddictedCS.Demo
 
             player.Play();
         }
-        //private static void StartRecording(string fileName)
-        //{
-        //    waveSource = new WaveInEvent
-        //    {
-        //        WaveFormat = new NAudio.Wave.WaveFormat(44100, 1)
-        //    };
 
-        //    waveSource.DataAvailable += new EventHandler<WaveInEventArgs>(WaveSource_DataAvailable);
-        //    waveSource.RecordingStopped += new EventHandler<StoppedEventArgs>(WaveSource_RecordingStopped);
-
-        //    waveFile = new WaveFileWriter(fileName+".wav", waveSource.WaveFormat);
-
-        //    waveSource.StartRecording();
-        //}
-        //private static void StopRecording()
-        //{
-        //    waveSource.StopRecording();
-        //}
-
-        //static void WaveSource_DataAvailable(object sender, WaveInEventArgs e)
-        //{
-        //    if (waveFile != null)
-        //    {
-        //        waveFile.Write(e.Buffer, 0, e.BytesRecorded);
-        //        waveFile.Flush();
-        //    }
-        //}
-
-        //static void WaveSource_RecordingStopped(object sender, StoppedEventArgs e)
-        //{
-        //    if (waveSource != null)
-        //    {
-        //        waveSource.Dispose();
-        //        waveSource = null;
-        //    }
-
-        //    if (waveFile != null)
-        //    {
-        //        waveFile.Dispose();
-        //        waveFile = null;
-        //    }
-        //}
         public static async Task<TrackData> GetBestMatchForSong(string queryAudioFile)
         {
             int secondsToAnalyze = 3; // number of seconds to analyze from query file
             int startAtSecond = 0; // start at the begining
 
+            var hashes = repo.GetAudioFingerprintHashes();
+            var track = new TrackInfo("Customers IVR", "Customers IVR", "Customers IVR");
+            modelService.Insert(track, hashes);
+            
             // query the underlying database for similar audio sub-fingerprints
             var queryResult = await QueryCommandBuilder.Instance.BuildQueryCommand()
                                                  .From(queryAudioFile, secondsToAnalyze, startAtSecond)
@@ -241,15 +179,11 @@ namespace SoundFingerprinting.AddictedCS.Demo
                                                  .UsingServices(modelService, audioService)
                                                  .Query();
             var trackData = queryResult.BestMatch?.Track;
-            
-            //emyModelService.RegisterMatches(queryResult.ResultEntries,trackData.MetaFields);
             return trackData;
         }
 
-        public static async Task StoreForLaterRetrieval(string pathToAudioFile, string trackInfo)
+        public static async Task StoreForLaterRetrieval(string pathToAudioFile)
         {
-            var track = new TrackInfo(trackInfo, trackInfo, trackInfo);
-
             // create fingerprints
             var hashedFingerprints = await FingerprintCommandBuilder.Instance
                                         .BuildFingerprintCommand()
@@ -258,11 +192,7 @@ namespace SoundFingerprinting.AddictedCS.Demo
                                         .UsingServices(audioService)
                                         .Hash();
             Console.WriteLine("Count of hashed fingerprints " + hashedFingerprints.Count);
-            Console.WriteLine("DUration in seconds " + hashedFingerprints.DurationInSeconds);
-
-
-            // store hashes in the database for later retrieval
-            modelService.Insert(track, hashedFingerprints);
+            repo.SaveAudioFingerprints(hashedFingerprints);
         }
     }
 }
