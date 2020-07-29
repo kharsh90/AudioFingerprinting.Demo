@@ -11,5 +11,7 @@ namespace SoundFingerprinting.AddictedCS.Demo.EFDatabase
         public byte[] OriginalPoint { get; set; }
         public int[] Hashbins { get; set; }
         public string StreamId { get; set; }
+
+        public string TrackInfo { get; set; }
     }
 }

@@ -7,11 +7,11 @@ namespace SoundFingerprinting.AddictedCS.Demo.Repositories
 {
     public class AudioFingerprintRepository : IAudioFingerprintRepository
     {
-        public void SaveAudioFingerprints(Hashes hashedFingerprints)
+        public void SaveAudioFingerprints(Hashes hashedFingerprints,string trackInfo)
         {
             using (SoundfingerprintingDbContext context = new SoundfingerprintingDbContext())
             {
-                if (!context.HashedFingerprint.Any(_ => _.StreamId == hashedFingerprints.StreamId))
+                if (!context.HashedFingerprint.Any(_ => _.TrackInfo == trackInfo))
                 {
 
                     var hashedFingerprintRows = new List<EFDatabase.HashedFingerprint>();
@@ -24,7 +24,8 @@ namespace SoundFingerprinting.AddictedCS.Demo.Repositories
                             StartsAt = fingerprint.StartsAt,
                             SequenceNumber = fingerprint.SequenceNumber,
                             Hashbins = fingerprint.HashBins,
-                            StreamId = hashedFingerprints.StreamId
+                            StreamId = hashedFingerprints.StreamId,
+                            TrackInfo = trackInfo
                         };
                         hashedFingerprintRows.Add(hfRow);
                     }
@@ -34,13 +35,13 @@ namespace SoundFingerprinting.AddictedCS.Demo.Repositories
             }
         }
 
-        Hashes IAudioFingerprintRepository.GetAudioFingerprintHashes()
+        Dictionary<string, List<Data.HashedFingerprint>> IAudioFingerprintRepository.GetAudioFingerprintHashes()
         {
-            var hashedFingerprints = new List<Data.HashedFingerprint>();
+            var hashedFingerprints = new Dictionary<string,List<Data.HashedFingerprint>>();
             using (var context = new SoundfingerprintingDbContext())
             {
                 var audioFingerprints = context.HashedFingerprint;
-
+                var key = string.Empty;
                 foreach (var audioFingerprint in audioFingerprints)
                 {
                     var fingerprint = new Data.HashedFingerprint(
@@ -48,12 +49,20 @@ namespace SoundFingerprinting.AddictedCS.Demo.Repositories
                         audioFingerprint.SequenceNumber,
                         (float)audioFingerprint.StartsAt,
                         audioFingerprint.OriginalPoint
-                        );
-                    hashedFingerprints.Add(fingerprint);
+                    );
+
+                    if (key != audioFingerprint.TrackInfo)
+                    {
+                        key = audioFingerprint.TrackInfo;
+                        hashedFingerprints.Add(key, new List<Data.HashedFingerprint> { fingerprint});
+                    }
+                    else
+                    {
+                        hashedFingerprints[key].Add(fingerprint);
+                    } 
                 }
             }
-            var hashes = new Hashes(hashedFingerprints, 1);
-            return hashes;
+            return hashedFingerprints;
         }
     }
 }
