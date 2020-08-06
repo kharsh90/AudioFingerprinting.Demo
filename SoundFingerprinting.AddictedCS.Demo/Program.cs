@@ -59,17 +59,15 @@ namespace SoundFingerprinting.AddictedCS.Demo
                         break;
                     case 2: _dbStorageChoice = userInput;
                         SaveAudioFingerprintsInFile();
-                        Console.WriteLine("Audio fingerprints saved successfully");
+                        
                         break;
                     case 3:
                         _dbStorageChoice = userInput;
                         SaveAudioFingerprintsInPostgreSql();
-                        Console.WriteLine("Audio fingerprints saved successfully");
                         break;
                     case 4:
                         _dbStorageChoice = userInput; 
                         SaveAudioFingerprintsInLMDB();
-                        Console.WriteLine("Audio fingerprints saved successfully");
                         break;
                     case 5: Console.WriteLine("Please mention sample file name to match audio");
                         var sampleAudioFileName = Console.ReadLine();
@@ -97,14 +95,37 @@ namespace SoundFingerprinting.AddictedCS.Demo
             Console.WriteLine("Best matching audio track is :" + foundTrack?.Track.Id);
             Console.WriteLine("Confidence level of audio matching is :" + foundTrack?.Confidence);
 
+            Console.WriteLine("Testing audio sample with faded audio");
+            foundTrack = await GetBestMatchForSong("./WelcomeABC_Alice_Faded_Audio.wav");
+            Console.WriteLine("Best matching audio track is :" + foundTrack?.Track.Id);
+            Console.WriteLine("Confidence level of audio matching is :" + foundTrack?.Confidence);
+
+            Console.WriteLine("Testing audio sample in Alice's missing voice");
+            foundTrack = await GetBestMatchForSong("./WelcomeABC_With_Missing_Audio_2.wav");
+            Console.WriteLine("Best matching audio track is :" + foundTrack?.Track.Id);
+            Console.WriteLine("Confidence level of audio matching is :" + foundTrack?.Confidence);
+
+            Console.WriteLine("Testing audio sample with missing audio. Trimmed one");
+            foundTrack = await GetBestMatchForSong("./Trimmed_WelcomeABC_WIth_Missing_Audio.wav");
+            Console.WriteLine("Best matching audio track is :" + foundTrack?.Track.Id);
+            Console.WriteLine("Confidence level of audio matching is :" + foundTrack?.Confidence);
+
+            Console.WriteLine("Testing audio sample with missing audio. To missing");
+            foundTrack = await GetBestMatchForSong("./Trimmed_WelcomeABC_WIth_Missing_Audio.wav");
+            Console.WriteLine("Best matching audio track is :" + foundTrack?.Track.Id);
+            Console.WriteLine("Confidence level of audio matching is :" + foundTrack?.Confidence);
+
+            Console.WriteLine("Testing audio sample in Alice's voice");
             foundTrack = await GetBestMatchForSong("./TrimmedAudio-Alice.wav");
             Console.WriteLine("Best matching audio track is :" + foundTrack?.Track.Id);
             Console.WriteLine("Confidence level of audio matching is :" + foundTrack?.Confidence);
 
+            Console.WriteLine("Testing audio sample in George's voice");
             foundTrack = await GetBestMatchForSong("./TrimmedAudio-George.wav");
             Console.WriteLine("Best matching audio track is :" + foundTrack?.Track.Id);
             Console.WriteLine("Confidence level of audio matching is :" + foundTrack?.Confidence);
 
+            Console.WriteLine("Testing audio sample in Jenna's voice");
             foundTrack = await GetBestMatchForSong("./TrimmedAudio-Jenna.wav");
             Console.WriteLine("Best matching audio track is :" + foundTrack?.Track.Id);
             Console.WriteLine("Confidence level of audio matching is :" + foundTrack?.Confidence);
@@ -114,6 +135,7 @@ namespace SoundFingerprinting.AddictedCS.Demo
         private static void SaveAudioFingerprintsInFile()
         {
             File.WriteAllText(_filePath,JsonConvert.SerializeObject(_audioFingerprints));
+            Console.WriteLine("Audio fingerprints saved successfully in a file.");
         }
 
         private static void SaveAudioFingerprintsInPostgreSql()
@@ -122,6 +144,7 @@ namespace SoundFingerprinting.AddictedCS.Demo
             {
                 repo.SaveAudioFingerprints(audiofingerprint.Value, audiofingerprint.Key);
             }
+            Console.WriteLine("Audio fingerprints saved successfully in PostgrSql database");
         }
 
         private static void SaveAudioFingerprintsInLMDB()
@@ -132,6 +155,7 @@ namespace SoundFingerprinting.AddictedCS.Demo
                 var value = audiofingerprint.Value;
                 lmdbModelService.Insert(new TrackInfo(key,key,key), value);
             }
+            Console.WriteLine("Audio fingerprints saved successfully in LMDB database");
         }
         public static void TrimWavFile(string inPath, string outPath, TimeSpan cutFromStart, TimeSpan cutFromEnd)
         {
